@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Text</title>
+<title>Mini Text Grid</title>
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #fff; }
@@ -82,6 +82,7 @@
       editor.addEventListener("focus", () => selectCell(r, c, false));
       editor.addEventListener("input", scheduleSave);
       editor.addEventListener("keydown", e => onKeyDown(e, r, c));
+      editor.addEventListener("paste", e => onGridPaste(e, r, c));
       td.addEventListener("mousedown", () => selectCell(r, c, false));
     }
     body.appendChild(tr);
@@ -104,6 +105,39 @@
       sel.addRange(range);
     }
     item.td.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+
+  function onGridPaste(e, startRow, startCol) {
+    const clipboard = e.clipboardData;
+    if (!clipboard) return;
+
+    const pastedText = clipboard.getData("text/plain");
+    if (!pastedText) return;
+
+    // Parse Excel/Sheets tab-separated cells and newline-separated rows.
+    const normalized = pastedText.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    const rows = normalized.split("\n");
+    if (rows.length > 1 && rows[rows.length - 1] === "") rows.pop();
+    const matrix = rows.map(line => line.split("\t"));
+
+    // Let normal browser paste handle a single cell's text.
+    if (matrix.length === 1 && matrix[0].length === 1) return;
+
+    e.preventDefault();
+
+    for (let rOffset = 0; rOffset < matrix.length; rOffset++) {
+      const targetRow = startRow + rOffset;
+      if (targetRow >= ROWS) break;
+
+      for (let cOffset = 0; cOffset < matrix[rOffset].length; cOffset++) {
+        const targetCol = startCol + cOffset;
+        if (targetCol >= COLS) break;
+        cells[targetRow][targetCol].editor.textContent = matrix[rOffset][cOffset];
+      }
+    }
+
+    scheduleSave();
+    selectCell(startRow, startCol, true);
   }
 
   function onKeyDown(e, r, c) {
